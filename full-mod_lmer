@@ -1,0 +1,203 @@
+library(lme4)
+library(emmeans)
+#library(car)
+library(lmerTest)
+library(multcompView)
+library(multcomp)
+#=================================================================#
+#OVERALL DATA, full model test across all Schoenoplectus plants
+#=================================================================#
+trait.d<-read.csv(file="All_data_plant_measurement_less_samp_corrected.csv")
+trait.d[trait.d==0]<-NA
+trait.d$Genotype<-as.factor(trait.d$Genotype)
+options(contrasts = c("contr.sum","contr.poly"))
+
+#GLB
+#+++++++++++++++++++++++++++#
+lm.mod.grn2<-lmer(log(greenlf_biom)~Salinity*Mbiome.trt*Site+Cohort+initial_wt_grams+(1|Genotype), 
+                 data=trait.d,na.action=na.omit)
+anova(lm.mod.grn2, dff="Satterthwaite")
+#+++++++++++++++++++++++++++#
+#AG
+#+++++++++++++++++++++++++++#
+agb.mod0<-lmer(log(AG_biom)~Salinity*Mbiome.trt*Site+Cohort+initial_wt_grams+(1|Genotype), 
+               data=trait.d,na.action=na.omit)
+anova(agb.mod0, dff="Satterthwaite") # get the analysis of variance table
+#+++++++++++++++++++++++++++#
+#BG
+#+++++++++++++++++++++++++++#
+bgb.mod0<-lmer(log(BG_biom)~Salinity*Mbiome.trt*Site+Cohort+initial_wt_grams+(1|Genotype), 
+               data=trait.d,na.action=na.omit)
+anova(bgb.mod0, dff="Satterthwaite")
+#+++++++++++++++++++++++++++#
+#Total Biomass
+#+++++++++++++++++++++++++++#
+trait.d$total_biom<-trait.d$AG_biom+trait.d$BG_biom
+
+total_b.mod01<-lmer(log(total_biom)~Salinity*Mbiome.trt*Site+Cohort+initial_wt_grams+(1|Genotype), 
+                   data=trait.d,na.action=na.omit)
+anova(total_b.mod01, dff="Satterthwaite")
+#+++++++++++++++++++++++++++#
+#root-to-shoot ratio
+#+++++++++++++++++++++++++++#
+trait.d$rtst<-trait.d$BG_biom/trait.d$AG_biom
+rtst.mod1<-lmer(log(rtst)~Salinity*Mbiome.trt*Site+Cohort+initial_wt_grams+(1|Genotype), 
+                    data=trait.d,na.action=na.omit)
+anova(rtst.mod1, dff="Satterthwaite")
+#significant interaction so
+#Post-hoc tests:
+all.rs.lsmeans<-lsmeans(rtst.mod1, pairwise~Salinity:Mbiome.trt:Site)
+all.rs.lsmeans
+all.rs.cld<-cld(all.rs.lsmeans$lsmeans,alpha=0.05, Letters=letters, adjust="tukey")
+all.rs.cld
+#all.rs.cld$.group=gsub(" ", "",all.rs.cld$.group)  ###  Remove spaces in .group
+#+++++++++++++++++++++++++++#
+#Plant height
+#+++++++++++++++++++++++++++#
+height.mod01<-lmer(log(final_aveheight)~Salinity*Mbiome.trt*Site+Cohort+initial_wt_grams+(1|Genotype), 
+                   data=trait.d,na.action=na.omit)
+anova(height.mod01, dff="Satterthwaite")
+
+#visualize nature of interaction
+emmip(height.mod01, Salinity ~ Mbiome.trt | Site)
+
+#Post-hoc tests:
+all.ht.lsmeans<-lsmeans(height.mod01, pairwise~Salinity:Mbiome.trt:Site)
+all.ht.lsmeans
+all.ht.cld<-cld(all.ht.lsmeans$lsmeans,alpha=0.05, Letters=letters, adjust="tukey")
+all.ht.cld
+all.ht.cld$.group=gsub(" ", "",all.ht.cld$.group)  ###  Remove spaces in .group
+#+++++++++++++++++++++++++++#
+#Plant size
+#+++++++++++++++++++++++++++#
+trait.d$plantsize<-trait.d$stemdiam_ave*trait.d$final_aveheight
+
+size.mod0<-lmer(log(plantsize)~Salinity*Mbiome.trt*Site+Cohort+initial_wt_grams+(1|Genotype), 
+                data=trait.d,na.action=na.omit)
+anova(size.mod0, dff="Satterthwaite")
+
+#+++++++++++++++++++++++++++#
+#Stem diameter
+#+++++++++++++++++++++++++++#
+diam.mod0<-lmer(log(stemdiam_ave)~Salinity*Mbiome.trt*Site+Cohort+initial_wt_grams+(1|Genotype), 
+                data=trait.d,na.action=na.omit)
+anova(diam.mod0, dff="Satterthwaite")
+#Stem number 
+#transform
+trait.d$sqstem_num<-sqrt(trait.d$stem_num)
+
+#no singularity
+stem.num.mod1<-lmer(sqstem_num~Salinity*Mbiome.trt*Site+Cohort+initial_wt_grams+(1|Genotype), 
+                    data=trait.d,na.action=na.omit)
+
+anova(stem.num.mod1, dff="Satterthwaite") # get the analysis of variance table
+
+#Post-hoc tests:
+all.sn.lsmeans<-lsmeans(stem.num.mod1, pairwise~Salinity:Mbiome.trt:Site)
+all.sn.lsmeans
+all.sn.cld<-cld(all.sn.lsmeans$lsmeans,alpha=0.05, Letters=letters, adjust="tukey")
+all.sn.cld
+all.sn.cld$.group=gsub(" ", "",all.sn.cld$.group)  ###  Remove spaces in .group
+#+++++++++++++++++++++++++++#
+#Stem density
+#+++++++++++++++++++++++++++#
+#area of each pot = 36 cm2
+trait.d$stemden<-trait.d$stem_num/36
+stemden.mod1<-lmer(log(stemden)~Salinity*Mbiome.trt*Site+Cohort+initial_wt_grams+(1|Genotype), 
+                   data=trait.d,na.action=na.omit)
+anova(stemden.mod1, dff="Satterthwaite")
+#Post-hoc tests:
+all.sd.lsmeans<-lsmeans(stemden.mod1, pairwise~Salinity:Mbiome.trt:Site)
+all.sd.lsmeans
+all.sd.cld<-cld(all.sd.lsmeans$lsmeans,alpha=0.05, Letters=letters, adjust="tukey")
+all.sd.cld
+all.sd.cld$.group=gsub(" ", "",all.sd.cld$.group)  ###  Remove spaces in .group
+
+#****************************#
+#microbe effect 
+#****************************#
+#change into wide format
+df.p<-read.csv(file="All_data_plant_measurement_less_samp_corrected.csv")
+df.p$id<-paste(df.p$Genotype,df.p$Clone,sep="-")
+df.p$Sal_ino<-paste(df.p$Salinity,df.p$Mbiome.trt,sep="-")
+write.table(df.p, file="plant_trait_long.csv", sep=',', row.names=FALSE)
+
+data_wide <- dcast(df.p, id+ Site+Salinity ~ Mbiome.trt, value.var="final_aveheight")
+#subtract for microbiome effect
+data_wide$mic_eff<-data_wide$Live-data_wide$Sterile
+write.table(data_wide, file="plant_trait_wide_height.csv", sep=',', row.names=FALSE)
+#plant size
+df<-read.csv(file="plant_trait_long.csv")
+df$plantsize<-df$stem_num*df$final_aveheight
+df.ps<- dcast(df, id+ Site+Salinity+Cohort ~ Mbiome.trt, value.var="plantsize")
+#subtract for microbiome effect
+df.ps$mic_eff<-df.ps$Live-df.ps$Sterile
+write.table(df.ps, file="plant_trait_wide_size.csv", sep=',', row.names=FALSE)
+#stem number
+df<-read.csv(file="plant_trait_long.csv")
+df.sd<- dcast(df, id+ Site+Salinity+Cohort ~ Mbiome.trt, value.var="stem_num")
+#subtract for microbiome effect
+df.sd$mic_eff<-df.sd$Live-df.sd$Sterile
+write.table(df.sd, file="plant_trait_wide_stem_num.csv", sep=',', row.names=FALSE)
+#stem_density
+df<-read.csv(file="plant_trait_long.csv")
+df$stemden<-df$stem_num/36
+df.sd<- dcast(df, id+ Site+Salinity+Cohort ~ Mbiome.trt, value.var="stemden")
+#subtract for microbiome effect
+df.sd$mic_eff<-df.sd$Live-df.sd$Sterile
+write.table(df.sd, file="plant_trait_wide_density.csv", sep=',', row.names=FALSE)
+
+#manually parse out the genotype
+#===============================#
+#GET LSMEANS
+#===============================#
+#+++++++++++++++++++++++++++#
+#height
+#+++++++++++++++++++++++++++#
+df.all<-read.csv(file="plant_trait_wide_height.csv")
+df.all$Genotype<-as.factor(df.all$Genotype)
+options(contrasts = c("contr.sum","contr.poly"))
+ph.mod<-lmer(mic_eff~Salinity*Site*Cohort+(1|Genotype), 
+                  data=df.all,na.action=na.omit)
+#test for main effects
+anova(ph.mod)
+
+#Post-hoc tests:
+all.ht.lsmeans<-lsmeans(ph.mod, pairwise~Salinity:Cohort:Site)
+all.ht.lsmeans
+all.ht.cld<-cld(all.ht.lsmeans$lsmeans,alpha=0.05, Letters=letters, adjust="tukey")
+all.ht.cld
+all.ht.cld$.group=gsub(" ", "",all.ht.cld$.group)  ###  Remove spaces in .group
+#+++++++++++++++++++++++++++#
+#SN
+#+++++++++++++++++++++++++++#
+df.sn<-read.csv(file="plant_trait_wide_stem_num.csv")
+df.sn$Genotype<-as.factor(df.sn$Genotype)
+options(contrasts = c("contr.sum","contr.poly"))
+sn.mod<-lmer(mic_eff~Salinity*Site*Cohort+(1|Genotype), 
+               data=df.sn,na.action=na.omit)
+#test for main effects
+anova(sn.mod)
+
+#Post-hoc tests: get lsmeans to plot
+sn.lsmeans<-lsmeans(sn.mod, pairwise~Salinity:Cohort:Site)
+sn.lsmeans
+sn.cld<-cld(sn.lsmeans$lsmeans,alpha=0.05, Letters=letters, adjust="tukey")
+sn.cld
+sn.cld$.group=gsub(" ", "",sn.cld$.group)  ###  Remove spaces in .group
+#++++++++++++++++++++++++++#
+#SD density
+#+++++++++++++++++++++++++++#
+df.sd<-read.csv(file="plant_trait_wide_density.csv")
+df.sd$Genotype<-as.factor(df.sd$Genotype)
+options(contrasts = c("contr.sum","contr.poly"))
+den.mod<-lmer(mic_eff~Salinity*Site*Cohort+(1|Genotype), 
+             data=df.sd,na.action=na.omit)
+#test for main effects
+anova(den.mod)
+#Post-hoc tests: get lsmeans to plot
+den.lsmeans<-lsmeans(den.mod, pairwise~Salinity:Cohort:Site)
+den.lsmeans
+den.cld<-cld(den.lsmeans$lsmeans,alpha=0.05, Letters=letters, adjust="tukey")
+den.cld
+den.cld$.group=gsub(" ", "",den.cld$.group)  ###  Remove spaces in .group
