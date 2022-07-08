@@ -1,0 +1,230 @@
+library(vegan)
+library(ggplot2)
+library(cowplot)
+library(lme4)
+#+++++++++++++++++++++++++++++++++++++++#
+#(+) sol-microbe treated plants only endosphere bacteria 
+#do the same for funig
+endo.bac<-read.csv(file="FinalData_scam_root_bacteria.csv")
+live.bac.endo<-endo.bac[endo.bac$Mbiome.trt=="Live"  ,]
+#Setting up contrasts:
+options(contrasts=c("contr.sum","contr.poly"))
+#test lme/lm
+bact.endo.live.mod1<-lmer(log(enspie)~Salinity*Cohort*Site+(1|Genotype), data=live.bac.endo, na.action=na.omit)
+anova(bact.endo.live.mod1, dff="Satterthwaite")
+summary(bact.endo.live.mod1)
+#random effects
+bact.endo.live.mod1<-lmer(log(enspie)~Salinity*Cohort*Site+(1|Genotype), data=live.bac.endo, na.action=na.omit)
+bact.endo.live.mod2 <-lm(log(enspie)~Salinity*Cohort*Site, data=live.bac.endo, na.action=na.omit)
+anova(bact.endo.live.mod1,bact.endo.live.mod2)
+#(-) soil-microbe plants
+endo.bac<-read.csv(file="FinalData_scam_root_bacteria.csv")
+sterile.endo.bac<-endo.bac[endo.bac$Mbiome.trt=="Sterile" ,]
+#Setting up contrasts:
+options(contrasts=c("contr.sum","contr.poly"))
+#test 
+bact.endo.sterile.mod1<-lmer(log(enspie)~Salinity*Cohort*Site+(1|Genotype), data=sterile.endo.bac, na.action=na.omit)
+anova(bact.endo.sterile.mod1, dff="Satterthwaite")
+summary(bact.endo.sterile.mod1)
+Anova(bact.endo.sterile.mod1, type=3)
+#random effects
+bact.endo.sterile.mod1<-lmer(log(enspie)~Salinity*Cohort*Site+(1|Genotype), data=sterile.endo.bac, na.action=na.omit)
+bact.endo.sterile.mod2 <-lm(log(enspie)~Salinity*Cohort*Site, data=sterile.endo.bac, na.action=na.omit)
+anova(bact.endo.sterile.mod1,bact.endo.sterile.mod2)
+
+#Root bacteria community composition
+#do the same for fungi
+#within vs between site; across all data
+endo.bac<-read.csv(file="FinalData_scam_root_bacteria.csv")
+#make as dummy variable
+# make dummy variable for Salinity
+endo.bac$salinity<-NA
+endo.bac$salinity[endo.bac$Salinity=="Low_0ppt"] <-0
+endo.bac$salinity[endo.bac$Salinity=="High_15ppt"] <-1
+with(endo.bac, table(salinity))
+# make dummy variable for microbiome treatment
+endo.bac$microbiome<-NA
+endo.bac$microbiome[endo.bac$Mbiome.trt=="Sterile"] <-0
+endo.bac$microbiome[endo.bac$Mbiome.trt=="Live"] <-1
+with(endo.bac, table(microbiome))
+# make dummy variable for microbiome treatment
+endo.bac$cohort<-NA
+endo.bac$cohort[endo.bac$Cohort=="Ancestral"] <-0
+endo.bac$cohort[endo.bac$Cohort=="Modern"] <-1
+with(endo.bac, table(cohort))
+# make dummy variable for microbiome treatment
+endo.bac$site<-NA
+endo.bac$site[endo.bac$Site=="Corn"] <-0
+endo.bac$site[endo.bac$Site=="Sellman"] <-1
+with(endo.bac, table(site))
+
+#make species matrix
+sp.cols.rt <- grep("otu_", names(endo.bac))
+# Make Bray Curtis dissimilarity matrix 
+# Square root transformation, Wisconsin double standardization,#this emphasizes the environmental variables
+scam.root.mat<-vegdist((endo.bac[,sp.cols.rt]), method="bray", binary=FALSE, metaMDS=TRUE, sqrt.dist=TRUE)
+dbRDA_all.root.1 <- capscale(scam.root.mat ~ site+salinity+cohort+microbiome, 
+                             data=endo.bac, na.option=na.omit)
+#Null Model
+#generate one model with NOTHING to explain the braycurtis dm matrix
+dbRDA_all.root.0 <- capscale(scam.root.mat~1,data=endo.bac)
+#use forward selection to choose which elements of the full model explain a significant amount of variaiton in the unifrac dm by comparing it to the null
+dbRDA_all.root <- ordistep(dbRDA_all.root.0,scope=formula(dbRDA_all.root.1),
+                           direction="forward",Pin=.1,trace=T,pstep=500000)
+dbRDA_all.root
+#test significance of analysis
+anova(dbRDA_all.root)
+#test 
+anova(dbRDA_all.root, by="margin")
+anova(dbRDA_all.root, by="terms", permu=200) # same above,test for sign. environ. variables
+# test axes for significance
+anova(dbRDA_all.root, by="axis", perm.max=500) 
+#barplot inertia for each PCo axes
+screeplot(dbRDA_all.root)
+#retrieve coefficient
+coef(dbRDA_all.root)
+#get residual from the model
+resid(dbRDA_all.root)
+#PLOT
+#any rid of NA values?
+anyNA(endo.bac)
+#make model sumary
+B <- summary(dbRDA_all.root)
+#plot
+A.1 <- scores(dbRDA_all.root)
+A.2 <- A.1$sites
+A.3 <- cbind(A.2, endo.bac)
+#scores for arows
+A.4 <- data.frame(scores(dbRDA_all.root, display = "bp"))
+#subset A4 for labeling
+A.4 <- A.4[sort(rownames(A.4)),]
+A4.sub1 <- A.4[2,]
+A4.sub2 <- A.4[1,]
+A4.sub3 <- A.4[3,]
+A4.sub4 <- A.4[4,]
+#make plot
+p <- ggplot(data = A.3, aes(x = CAP1, y = CAP2))
+p.dbrda.root.bac <- p +
+  geom_point(data = A.3, alpha = 2/5, size=4,
+             aes(shape = Site, color = Mbiome.trt, fill=Mbiome.trt, stroke = 1)) +
+  theme_bw() + scale_color_manual(values=c("black", "red"))+
+  scale_fill_manual(values=c("black", "red"))+
+  xlab(label = paste("CAP1 (", round(B$concont$importance[2,1]*100, digits = 1), "%)", sep="")) +
+  ylab(label = paste("CAP2 (", round(B$concont$importance[2,2]*100, digits = 1), "%)", sep="")) +
+  scale_shape_manual(name = "Site", labels = c("Corn", "Sellman"), 
+                     values = c(1,17))
+p.dbrda.root.bac
+#ggsave(filename="Fig_dbrda_root_bacteria.tiff", plot=p.dbrda.root.bac, dpi=400, units=c("mm"), width=120, height=100)
+
+#(LIVE)+) soil-microbe treatment only
+#within vs between site; across all data
+endo.bac<-read.csv(file="All_root_bacteria_data_rarefied.csv")
+live.bac<-endo.bac[endo.bac$Mbiome.trt=="Live"  ,]
+#make as dummy variable
+# make dummy variable for Salinity
+live.bac$salinity<-NA
+live.bac$salinity[live.bac$Salinity=="Low_0ppt"] <-0
+live.bac$salinity[live.bac$Salinity=="High_15ppt"] <-1
+with(live.bac, table(salinity))
+# make dummy variable for microbiome treatment
+live.bac$microbiome<-NA
+live.bac$microbiome[live.bac$Mbiome.trt=="Sterile"] <-0
+live.bac$microbiome[live.bac$Mbiome.trt=="Live"] <-1
+with(live.bac, table(microbiome))
+# make dummy variable for microbiome treatment
+live.bac$cohort<-NA
+live.bac$cohort[live.bac$Cohort=="Ancestral"] <-0
+live.bac$cohort[live.bac$Cohort=="Modern"] <-1
+with(live.bac, table(cohort))
+# make dummy variable for microbiome treatment
+live.bac$site<-NA
+live.bac$site[live.bac$Site=="Corn"] <-0
+live.bac$site[live.bac$Site=="Sellman"] <-1
+with(live.bac, table(site))
+
+#make species matrix
+sp.cols.rt <- grep("otu_", names(live.bac))
+# Make Bray Curtis dissimilarity matrix 
+# Square root transformation, Wisconsin double standardization,#this emphasizes the environmental variables
+scam.root.mat<-vegdist((live.bac[,sp.cols.rt]), method="bray", binary=FALSE, metaMDS=TRUE, sqrt.dist=TRUE)
+
+dbRDA_all.root.1 <- capscale(scam.root.mat ~ site+salinity+cohort+microbiome, 
+                             data=live.bac, na.option=na.omit)
+#Null Model
+#generate one model with NOTHING to explain the braycurtis dm matrix
+dbRDA_all.root.0 <- capscale(scam.root.mat~1,data=live.bac)
+#use forward selection to choose which elements of the full model explain a significant amount of variaiton in the unifrac dm by comparing it to the null
+
+dbRDA_all.root <- ordistep(dbRDA_all.root.0,scope=formula(dbRDA_all.root.1),
+                           direction="forward",Pin=.1,trace=T,pstep=500000)
+dbRDA_all.root
+#test significance of analysis
+anova(dbRDA_all.root)
+#test 
+anova(dbRDA_all.root, by="margin")
+anova(dbRDA_all.root, by="terms", permu=200) # same above,test for sign. environ. variables
+# test axes for significance
+anova(dbRDA_all.root, by="axis", perm.max=500) 
+#barplot inertia for each PCo axes
+screeplot(dbRDA_all.root)
+#retrieve coefficient
+coef(dbRDA_all.root)
+#get residual from the model
+resid(dbRDA_all.root)
+#PLOT
+anyNA(live.bac)
+#make model sumary
+B <- summary(dbRDA_all.root)
+#plot
+A.1 <- scores(dbRDA_all.root)
+A.2 <- A.1$sites
+A.3 <- cbind(A.2, live.bac)
+#scores for arows
+A.4 <- data.frame(scores(dbRDA_all.root, display = "bp"))
+#subset A4 for labeling
+A.4 <- A.4[sort(rownames(A.4)),]
+A4.sub1 <- A.4[2,]
+A4.sub2 <- A.4[1,]
+#make plot
+p <- ggplot(data = A.3, aes(x = CAP1, y = CAP2))
+p.dbrda.root.bac <- p +
+  geom_point(data = A.3, alpha = 2/5, size=4,
+             aes(shape = Site, color = Salinity, fill=Salinity, stroke = 1)) +
+  theme_bw() + scale_color_manual(values=c("black", "red"))+
+  scale_fill_manual(values=c("black", "red"))+
+  xlab(label = paste("CAP1 (", round(B$concont$importance[2,1]*100, digits = 1), "%)", sep="")) +
+  ylab(label = paste("CAP2 (", round(B$concont$importance[2,2]*100, digits = 1), "%)", sep="")) +
+  scale_shape_manual(name = "Site", labels = c("Corn", "Sellman"), 
+                     values = c(1,17))
+p.dbrda.root.bac
+ggsave(filename="Fig_dbrda_root_bacteria_live.tiff", plot=p.dbrda.root.bac, dpi=400, units=c("mm"), width=120, height=100)
+#-------------------------#
+#indicator species_using indicspecies
+#-------------------------#
+endo.bac<-read.csv(file="FinalData_scam_root_bacteria.csv")
+#select columns with the otu and convert to mvabubd df
+bac.otu.ind <-endo.bac[,33:7240]
+group<-as.factor(interaction(endo.bac$Salinity,endo.bac$Mbiome.trt,endo.bac$Cohort))
+
+#conduct analysis; restrict to 3 groupings
+indc.bac<- multipatt(bac.otu.ind, group, max.order=1,
+                     func = "r.g", control = how(nperm=9999))
+data.frame(unclass(summary(indc.bac)))
+write.table(indic.sum, file="root_bacteria_indic_spp.csv", sep=',',quote = FALSE, row.names = F)
+#identify otus 
+otu<-read.csv(file="otu_id.csv")
+taxa<-read.csv(file="bacteria_root_tax_ID.csv")
+#keep order of the rows in otu file
+merge.d<-merge(otu, taxa, by="otu_id", sort=FALSE)
+write.table(merge.d, file="top_10_indicator_spp.csv", sep=',', row.names=FALSE)
+endo.fung<-read.csv(file="FinalData_scam_root_fungi.csv")
+#FUNGI
+endo.fung<-read.csv(file="FinalData_scam_root_fungi.csv")
+#select columns with the otu and convert to mvabubd df
+fungi.otu.ind <-endo.fung[,33:578]
+group<-as.factor(interaction(endo.fung$Salinity,endo.fung$Mbiome.trt,endo.fung$Cohort))
+
+#conduct analysis; restrict to 3 groupings
+indc.fungi<- multipatt(fungi.otu.ind, group, max.order=1,
+                       func = "r.g", control = how(nperm=9999))
+summary(indc.fungi)
