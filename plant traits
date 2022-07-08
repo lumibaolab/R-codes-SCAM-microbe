@@ -8,7 +8,6 @@ library(pbkrtest)
 library(broom.mixed)
 #=================================================================#
 #OVERALL DATA, full model test across all Schoenoplectus plants
-
 trait.d<-read.csv(file="All_data_plant_measurement_less_samp_corrected.csv")
 trait.d[trait.d==0]<-NA
 trait.d$Genotype<-as.factor(trait.d$Genotype)
@@ -336,7 +335,89 @@ stemden.mod2<-lmer(log(stemden)~Salinity*Mbiome.trt+Cohort+initial_wt_grams+(Mbi
                    data=corn.d,na.action=na.omit)
 anova(stemden.mod0,stemden.mod1,stemden.mod2)
 
-#microbe effect  
+#random likelihood test for genotype at site level
+#SELLMAN, do the same for corn and across all dataset
+#=================================================================#
+trait.d<-read.csv(file="All_data_plant_measurement_less_samp_corrected.csv")
+sellman<-trait.d[trait.d$Site=="Sellman",]
+sellman[sellman==0]<-NA
+sellman$Genotype<-as.factor(sellman$Genotype)
+options(contrasts = c("contr.sum","contr.poly"))
+
+#GLB
+lm.mod.grn2<-lmer(log(greenlf_biom)~Salinity*Mbiome.trt*Cohort+initial_wt_grams+(1|Genotype), 
+                  data=sellman,na.action=na.omit)
+lm.mod.grn3<-lm(log(greenlf_biom)~Salinity*Mbiome.trt*Cohort+initial_wt_grams, 
+                data=sellman,na.action=na.omit)
+anova(lm.mod.grn2,lm.mod.grn3)
+#AG
+agb.mod0<-lmer(log(AG_biom)~Salinity*Mbiome.trt*Cohort+initial_wt_grams+(1|Genotype), 
+               data=sellman,na.action=na.omit)
+agb.mod1<-lm(log(AG_biom)~Salinity*Mbiome.trt*Cohort+initial_wt_grams, 
+             data=sellman,na.action=na.omit)
+anova(agb.mod0, agb.mod1)
+
+#BG
+bgb.mod0<-lmer(log(BG_biom)~Salinity*Mbiome.trt*Cohort+initial_wt_grams+(1|Genotype), 
+               data=sellman,na.action=na.omit)
+bgb.mod1<-lm(log(BG_biom)~Salinity*Mbiome.trt*Cohort+initial_wt_grams, 
+             data=sellman,na.action=na.omit)
+anova(bgb.mod0, bgb.mod1)
+#Total Biomass
+sellman$total_biom<-sellman$AG_biom+sellman$BG_biom
+total_b.mod0<-lmer(log(total_biom)~Salinity*Mbiome.trt*Cohort+initial_wt_grams+(1|Genotype), 
+                   data=sellman,na.action=na.omit)
+total_b.mod1<-lm(log(total_biom)~Salinity*Mbiome.trt*Cohort+initial_wt_grams, 
+                 data=sellman,na.action=na.omit)
+anova(total_b.mod0, total_b.mod1)
+#root-to-shoot ratio
+sellman$rtst<-sellman$BG_biom/sellman$AG_biom
+rtst.mod1<-lmer(log(rtst)~Salinity*Mbiome.trt*Cohort+initial_wt_grams+(1|Genotype), 
+                data=sellman,na.action=na.omit)
+rtst.mod2<-lm(log(rtst)~Salinity*Mbiome.trt*Cohort+initial_wt_grams, 
+              data=sellman,na.action=na.omit)
+anova(rtst.mod1, rtst.mod2)
+
+#Plant height
+height.mod00<-lmer(log(final_aveheight)~Salinity*Mbiome.trt*Cohort+initial_wt_grams+(1|Genotype), 
+                   data=sellman,na.action=na.omit)
+height.mod1<-lm(log(final_aveheight)~Salinity*Mbiome.trt*Cohort+initial_wt_grams, 
+                data=sellman,na.action=na.omit)
+anova(height.mod00, height.mod1)
+#Plant size
+sellman$plantsize<-sellman$stemdiam_ave*sellman$final_aveheight
+size.mod2<-lmer(log(plantsize)~Salinity*Mbiome.trt*Cohort+initial_wt_grams+(1|Genotype), 
+                data=sellman,na.action=na.omit)
+size.mod3<-lm(log(plantsize)~Salinity*Mbiome.trt*Cohort+initial_wt_grams, 
+              data=sellman,na.action=na.omit)
+anova(size.mod2, size.mod3)
+
+#Stem diameter
+diam.mod0<-lmer(log(stemdiam_ave)~Salinity*Mbiome.trt*Cohort+initial_wt_grams+(1|Genotype), 
+                data=sellman,na.action=na.omit)
+diam.mod1<-lm(log(stemdiam_ave)~Salinity*Mbiome.trt*Cohort+initial_wt_grams, 
+              data=sellman,na.action=na.omit)
+anova(diam.mod0, diam.mod1)
+#Stem number 
+#transform
+sellman$sqstem_num<-sqrt(sellman$stem_num)
+# singularity
+stem.num.mod1<-lmer(sqstem_num~Salinity*Mbiome.trt*Cohort+initial_wt_grams+(1|Genotype), 
+                    data=sellman,na.action=na.omit)
+stem.num.mod2<-lm(sqstem_num~Salinity*Mbiome.trt*Cohort+initial_wt_grams, 
+                  data=sellman,na.action=na.omit)
+anova(stem.num.mod1, stem.num.mod2)
+#Stem density
+#area of each pot = 36 cm2
+sellman$stemden<-sellman$stem_num/36
+# singularity
+stemden.mod1<-lmer(log(stemden)~Salinity*Mbiome.trt*Cohort+initial_wt_grams+(1|Genotype), 
+                   data=sellman,na.action=na.omit)
+stemden.mod2<-lm(log(stemden)~Salinity*Mbiome.trt*Cohort+initial_wt_grams, 
+                 data=sellman,na.action=na.omit)
+anova(stemden.mod1, stemden.mod2)
+
+#microbe effect test 
 #change into wide format
 df.p<-read.csv(file="All_data_plant_measurement_less_samp_corrected.csv")
 df.p$id<-paste(df.p$Genotype,df.p$Clone,sep="-")
@@ -406,11 +487,14 @@ anova(den.mod)
 den.emmeans<-emmeans(den.mod, pairwise~Salinity:Cohort:Site)
 den.emmeans
 
-#PLSR
+
+#+++++++++++#
+#PLSR, do for both fungi and bacteria
 fundiv<-read.csv(file="FinalData_scam_root_fungi.csv")
 #replace 0 with NAs
 fundiv[fundiv==0]<-NA
 fundiv$Genotype<-as.factor(fundiv$Genotype)
+
 #perform plsr
 fundiv$total_biom<-fundiv$AG_biom+fundiv$BG_biom
 fundiv$stemden<-fundiv$stem_num/36
